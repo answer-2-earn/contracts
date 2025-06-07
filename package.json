@@ -1,0 +1,14 @@
+{
+  "name": "contracts",
+  "version": "0.1.0",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
+    "dotenv": "^16.5.0",
+    "hardhat": "^2.23.0"
+  },
+  "dependencies": {
+    "@erc725/erc725.js": "^0.27.2",
+    "@lukso/lsp-smart-contracts": "^0.16.3",
+    "@openzeppelin/contracts": "^4.9.6"
+  }
+}
