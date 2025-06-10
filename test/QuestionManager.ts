@@ -1,8 +1,8 @@
-import { ERC725 } from "@erc725/erc725.js";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import { expect } from "chai";
 import hre from "hardhat";
-import { Hex, parseEther } from "viem";
+import { parseEther } from "viem";
+import { getAnswerMetadataValue, getAskMetadataValue } from "./utils/metadata";
 
 describe("QuestionManager", function () {
   async function initFixture() {
@@ -38,39 +38,6 @@ describe("QuestionManager", function () {
     };
   }
 
-  async function createMetadata() {
-    const metadata = {
-      asker: "0x4018737e0D777b3d4C72B411a3BeEC286Ec5F5eF",
-      question: "What is your dream?",
-      questionDate: 1746028080,
-      answerer: "0x2EC3af24fB102909f31535Ef0d825c8BFb873aB2",
-      answer: "",
-      answerDate: 0,
-    };
-    const metadataUrl = "ipfs://empty";
-    const schema = [
-      {
-        name: "LSP4Metadata",
-        key: "0x9afb95cacc9f95858ec44aa8c3b685511002e30ae54415823f406128b85b238e",
-        keyType: "Singleton",
-        valueType: "bytes",
-        valueContent: "VerifiableURI",
-      },
-    ];
-    const erc725 = new ERC725(schema);
-    const encodedMetadata = erc725.encodeData([
-      {
-        keyName: "LSP4Metadata",
-        value: {
-          json: metadata,
-          url: metadataUrl,
-        },
-      },
-    ]);
-    const encodedMetadataValue = encodedMetadata.values[0] as Hex;
-    return { encodedMetadataValue };
-  }
-
   it("Should ask, answer and verify a question", async function () {
     const {
       publicClient,
@@ -81,12 +48,9 @@ describe("QuestionManager", function () {
       questionManagerContract,
     } = await loadFixture(initFixture);
 
-    // Create a metadata object
-    const { encodedMetadataValue } = await createMetadata();
-
     // Ask question by user two
     await questionManagerContract.write.ask(
-      [userOne.account.address, encodedMetadataValue],
+      [userOne.account.address, getAskMetadataValue()],
       {
         account: userTwo.account,
         value: parseEther("1"),
@@ -100,11 +64,14 @@ describe("QuestionManager", function () {
     const token = tokens[0];
 
     // Answer question by user one
-    await questionManagerContract.write.answer([token, "0x0"], {
-      account: userOne.account,
-    });
+    await questionManagerContract.write.answer(
+      [token, getAnswerMetadataValue()],
+      {
+        account: userOne.account,
+      }
+    );
 
-    // Check user balance before verifying
+    // Check user one balance before verifying
     const userOneBalanceBefore = await publicClient.getBalance({
       address: userOne.account.address,
     });
@@ -119,18 +86,18 @@ describe("QuestionManager", function () {
       account: deployer.account,
     });
 
-    // Check reward after verifying
-    const rewardAfter = await questionManagerContract.read.getReward([token]);
-    expect(rewardAfter.value).to.equal(parseEther("1"));
-    expect(rewardAfter.sent).to.equal(true);
-
-    // Check user balance after verifying
+    // Check user one balance after verifying
     const userOneBalanceAfter = await publicClient.getBalance({
       address: userOne.account.address,
     });
     expect(userOneBalanceAfter - userOneBalanceBefore).to.be.equal(
       parseEther("1")
     );
+
+    // Check reward after verifying
+    const rewardAfter = await questionManagerContract.read.getReward([token]);
+    expect(rewardAfter.value).to.equal(parseEther("1"));
+    expect(rewardAfter.sent).to.equal(true);
   });
 
   it("Should ask and cancel a question", async function () {
@@ -142,9 +109,6 @@ describe("QuestionManager", function () {
       questionManagerContract,
     } = await loadFixture(initFixture);
 
-    // Create a metadata object
-    const { encodedMetadataValue } = await createMetadata();
-
     // Get user balance before asking
     const userTwoBalanceBefore = await publicClient.getBalance({
       address: userTwo.account.address,
@@ -153,7 +117,7 @@ describe("QuestionManager", function () {
     // Ask question by user two
     const questionValue = parseEther("1");
     await questionManagerContract.write.ask(
-      [userOne.account.address, encodedMetadataValue],
+      [userOne.account.address, getAskMetadataValue()],
       {
         account: userTwo.account,
         value: questionValue,
