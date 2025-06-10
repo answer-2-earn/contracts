@@ -254,4 +254,45 @@ describe("QuestionManager", function () {
       expect(error).to.exist;
     }
   });
+
+  it("Should transfer question ownership", async function () {
+    const { deployer, userOne, questionContract, questionManagerContract } =
+      await loadFixture(initFixture);
+
+    // Check that the Question contract is owned by the QuestionManager
+    const initialOwner = await questionContract.read.owner();
+    expect(initialOwner.toLowerCase()).to.equal(
+      questionManagerContract.address.toLowerCase()
+    );
+
+    // Call the function on the question manager to transfer question ownership
+    await questionManagerContract.write.transferQuestionOwnership(
+      [userOne.account.address],
+      {
+        account: deployer.account,
+      }
+    );
+
+    // Verify that userOne is now the owner of the Question contract
+    const newOwner = await questionContract.read.owner();
+    expect(newOwner.toLowerCase()).to.equal(
+      userOne.account.address.toLowerCase()
+    );
+
+    // Attempt to transfer ownership with a non-owner account (should fail)
+    try {
+      await questionManagerContract.write.transferQuestionOwnership(
+        [deployer.account.address],
+        {
+          account: userOne.account,
+        }
+      );
+      expect.fail(
+        "Expected an error when non-owner tries to transfer ownership"
+      );
+    } catch (error) {
+      // Error is expected as only the owner should be able to transfer ownership
+      expect(error).to.exist;
+    }
+  });
 });

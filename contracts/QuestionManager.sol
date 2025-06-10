@@ -146,6 +146,10 @@ contract QuestionManager is Initializable, OwnableUpgradeable, ReentrancyGuard {
         }
     }
 
+    function transferQuestionOwnership(address newOwner) public onlyOwner {
+        question.transferOwnership(newOwner);
+    }
+
     /**
      * @dev Get the reward information for a specific question.
      * @param tokenId The ID of the question token.
