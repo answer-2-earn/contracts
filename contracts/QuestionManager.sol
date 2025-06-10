@@ -33,13 +33,20 @@ contract QuestionManager is Initializable, OwnableUpgradeable, ReentrancyGuard {
         uint256 value
     );
 
+    event QuestionVerified(bytes32 indexed tokenId, bool success);
+
     Question public question;
+    address public verifier;
     mapping(bytes32 tokenId => Reward) public rewards;
     mapping(bytes32 tokenId => address) public askers;
 
-    function initialize(address questionAddress) public initializer {
+    function initialize(
+        address questionAddress,
+        address verifierAddress
+    ) public initializer {
         __Ownable_init();
         question = Question(payable(questionAddress));
+        verifier = verifierAddress;
     }
 
     /**
@@ -77,29 +84,18 @@ contract QuestionManager is Initializable, OwnableUpgradeable, ReentrancyGuard {
         );
     }
 
-    /**
-     * @dev Answer a question and send the reward to the answerer.
-     * @notice This function can only be called by the contract owner.
-     * @param tokenId The ID of the question token.
-     * @param metadataValue The metadata of the answer.
-     */
     function answer(
         bytes32 tokenId,
         bytes memory metadataValue
-    ) public nonReentrant onlyOwner {
+    ) public nonReentrant {
+        require(
+            question.tokenOwnerOf(tokenId) == msg.sender,
+            "Only answerer can answer"
+        );
         require(!rewards[tokenId].sent, "Reward already sent");
-
-        // Update the state before external call
-        rewards[tokenId].sent = true;
 
         // Update the metadata for the token
         question.setDataForTokenId(tokenId, _LSP4_METADATA_KEY, metadataValue);
-
-        // Transfer the reward to the answerer
-        (bool success, ) = question.tokenOwnerOf(tokenId).call{
-            value: rewards[tokenId].value
-        }("");
-        require(success, "Transfer failed");
 
         emit QuestionAnswered(
             question.tokenOwnerOf(tokenId),
@@ -112,8 +108,8 @@ contract QuestionManager is Initializable, OwnableUpgradeable, ReentrancyGuard {
      * @dev Cancel a question and reclaim the reward before it's answered.
      * @param tokenId The ID of the question token.
      */
-    function cancelQuestion(bytes32 tokenId) public nonReentrant {
-        require(askers[tokenId] == msg.sender, "Only the asker can cancel");
+    function cancel(bytes32 tokenId) public nonReentrant {
+        require(askers[tokenId] == msg.sender, "Only asker can cancel");
         require(!rewards[tokenId].sent, "Reward already sent");
 
         uint256 rewardValue = rewards[tokenId].value;
@@ -129,6 +125,26 @@ contract QuestionManager is Initializable, OwnableUpgradeable, ReentrancyGuard {
         question.burn(tokenId, "");
 
         emit QuestionCancelled(msg.sender, tokenId, rewardValue);
+    }
+
+    function verify(bytes32 tokenId, bool status) public nonReentrant {
+        require(verifier == msg.sender, "Only verifier can verify");
+        require(!rewards[tokenId].sent, "Reward already sent");
+
+        if (status) {
+            // Update the state before external call
+            rewards[tokenId].sent = true;
+
+            // Transfer the reward to the answerer
+            (bool success, ) = question.tokenOwnerOf(tokenId).call{
+                value: rewards[tokenId].value
+            }("");
+            require(success, "Transfer failed");
+
+            emit QuestionVerified(tokenId, true);
+        } else {
+            emit QuestionVerified(tokenId, false);
+        }
     }
 
     /**

@@ -20,7 +20,10 @@ describe("QuestionManager", function () {
       "QuestionManager",
       []
     );
-    questionManagerContract.write.initialize([questionContract.address]);
+    questionManagerContract.write.initialize([
+      questionContract.address,
+      deployer.account.address,
+    ]);
 
     // Transfer ownership of question contract to question manager
     questionContract.write.transferOwnership([questionManagerContract.address]);
@@ -68,7 +71,7 @@ describe("QuestionManager", function () {
     return { encodedMetadataValue };
   }
 
-  it("Should ask and answer a question", async function () {
+  it("Should ask, answer and verify a question", async function () {
     const {
       publicClient,
       deployer,
@@ -96,27 +99,32 @@ describe("QuestionManager", function () {
     ]);
     const token = tokens[0];
 
-    // Check user balance before answering
+    // Answer question by user one
+    await questionManagerContract.write.answer([token, "0x0"], {
+      account: userOne.account,
+    });
+
+    // Check user balance before verifying
     const userOneBalanceBefore = await publicClient.getBalance({
       address: userOne.account.address,
     });
 
-    // Check reward before answering
+    // Check reward before verifying
     const rewardBefore = await questionManagerContract.read.getReward([token]);
     expect(rewardBefore.value).to.equal(parseEther("1"));
     expect(rewardBefore.sent).to.equal(false);
 
-    // Answer question by deployer
-    await questionManagerContract.write.answer([token, "0x0"], {
+    // Verify question by deployer
+    await questionManagerContract.write.verify([token, true], {
       account: deployer.account,
     });
 
-    // Check reward after answering
+    // Check reward after verifying
     const rewardAfter = await questionManagerContract.read.getReward([token]);
     expect(rewardAfter.value).to.equal(parseEther("1"));
     expect(rewardAfter.sent).to.equal(true);
 
-    // Check user balance after answering
+    // Check user balance after verifying
     const userOneBalanceAfter = await publicClient.getBalance({
       address: userOne.account.address,
     });
@@ -180,7 +188,7 @@ describe("QuestionManager", function () {
     ).to.be.at.least(Number(questionValue));
 
     // Cancel the question
-    await questionManagerContract.write.cancelQuestion([token], {
+    await questionManagerContract.write.cancel([token], {
       account: userTwo.account,
     });
 
