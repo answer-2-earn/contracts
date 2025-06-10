@@ -2,7 +2,7 @@ import hre from "hardhat";
 import { CONTRACTS } from "./data/deployed-contracts";
 
 async function main() {
-  console.log("👟 Start script 'deploy-contracts'");
+  console.log("Deploying contracts...");
 
   const network = hre.network.name;
   const [deployer] = await hre.ethers.getSigners();
