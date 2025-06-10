@@ -3,11 +3,15 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {_LSP4_METADATA_KEY} from "@lukso/lsp-smart-contracts/contracts/LSP4DigitalAssetMetadata/LSP4Constants.sol";
 import {Question} from "./Question.sol";
 
-contract QuestionManager is Initializable, OwnableUpgradeable, ReentrancyGuard {
+contract QuestionManager is
+    Initializable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     struct Reward {
         uint256 value;
         bool sent;
@@ -45,6 +49,7 @@ contract QuestionManager is Initializable, OwnableUpgradeable, ReentrancyGuard {
         address verifierAddress
     ) public initializer {
         __Ownable_init();
+        __ReentrancyGuard_init();
         question = Question(payable(questionAddress));
         verifier = verifierAddress;
     }
