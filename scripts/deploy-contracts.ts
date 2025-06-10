@@ -5,10 +5,39 @@ async function main() {
   console.log("👟 Start script 'deploy-contracts'");
 
   const network = hre.network.name;
+  const [deployer] = await hre.ethers.getSigners();
 
   if (!CONTRACTS[network].question) {
-    const contract = await hre.viem.deployContract("Question", []);
-    console.log(`Contract 'Question' deployed to: ${contract.address}`);
+    console.log(`Deploying 'Question' contract...`);
+    const question = await hre.ethers.deployContract("Question", []);
+    await question.waitForDeployment();
+    console.log(`Contract 'Question' deployed: ${await question.getAddress()}`);
+  }
+
+  if (!CONTRACTS[network].questionManager && CONTRACTS[network].question) {
+    // Deploy question manager contract
+    console.log(`Deploying 'QuestionManager' contract...`);
+    const questionManagerFactory = await hre.ethers.getContractFactory(
+      "QuestionManager"
+    );
+    const questionManager = await hre.upgrades.deployProxy(
+      questionManagerFactory,
+      [CONTRACTS[network].question, deployer.address]
+    );
+    await questionManager.waitForDeployment();
+    console.log(
+      `Contract 'QuestionManager' deployed: ${await questionManager.getAddress()}`
+    );
+    // Transfer ownership of question contract to question manager contract
+    console.log(
+      `Transferring ownership of 'Question' contract to 'QuestionManager'...`
+    );
+    const question = await hre.ethers.getContractAt(
+      "Question",
+      CONTRACTS[network].question
+    );
+    await question.transferOwnership(await questionManager.getAddress());
+    console.log(`Ownership of 'Question' contract transferred`);
   }
 }
 
