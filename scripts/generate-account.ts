@@ -1,16 +1,11 @@
 import { generatePrivateKey, privateKeyToAddress } from "viem/accounts";
 
-async function generateAccount() {
+async function main() {
+  console.log("Generating an account...");
   const privateKey = generatePrivateKey();
   const address = privateKeyToAddress(privateKey);
   console.log("Generated account private key:", privateKey);
   console.log("Generated account address:", address);
-}
-
-async function main() {
-  console.log("👟 Start script 'playground'");
-
-  await generateAccount();
 }
 
 main().catch((error) => {
