@@ -55,7 +55,6 @@ contract QuestionManager is Initializable, OwnableUpgradeable, ReentrancyGuard {
      * @param metadataValue The metadata of the question being asked.
      */
     function ask(address answerer, bytes memory metadataValue) public payable {
-        require(msg.value > 0, "Value must be greater than 0");
         require(answerer != address(0), "Answerer cannot be zero address");
         require(answerer != msg.sender, "Cannot ask yourself");
 

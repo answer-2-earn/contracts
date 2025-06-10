@@ -100,6 +100,74 @@ describe("QuestionManager", function () {
     expect(rewardAfter.sent).to.equal(true);
   });
 
+  it("Should ask, answer and verify a question without value", async function () {
+    const {
+      publicClient,
+      deployer,
+      userOne,
+      userTwo,
+      questionContract,
+      questionManagerContract,
+    } = await loadFixture(initFixture);
+
+    // Ask question by user two with zero value
+    await questionManagerContract.write.ask(
+      [userOne.account.address, getAskMetadataValue()],
+      {
+        account: userTwo.account,
+      }
+    );
+
+    // Get question token
+    const tokens = await questionContract.read.tokenIdsOf([
+      userOne.account.address,
+    ]);
+    const token = tokens[0];
+
+    // Check reward after asking
+    const rewardAfterAsking = await questionManagerContract.read.getReward([
+      token,
+    ]);
+    expect(rewardAfterAsking.value).to.equal(0n);
+    expect(rewardAfterAsking.sent).to.equal(false);
+
+    // Check asker is correct
+    const asker = await questionManagerContract.read.getAsker([token]);
+    expect(asker.toLowerCase()).to.equal(userTwo.account.address.toLowerCase());
+
+    // Answer question by user one
+    await questionManagerContract.write.answer(
+      [token, getAnswerMetadataValue()],
+      {
+        account: userOne.account,
+      }
+    );
+
+    // Check user one balance before verifying (should stay the same after verification since no value)
+    const userOneBalanceBefore = await publicClient.getBalance({
+      address: userOne.account.address,
+    });
+
+    // Verify question by deployer
+    await questionManagerContract.write.verify([token, true], {
+      account: deployer.account,
+    });
+
+    // Check user one balance after verifying
+    const userOneBalanceAfter = await publicClient.getBalance({
+      address: userOne.account.address,
+    });
+
+    // Balance should stay approximately the same (might be slightly different due to gas costs)
+    const balanceDifference = userOneBalanceAfter - userOneBalanceBefore;
+    expect(balanceDifference).to.equal(0n);
+
+    // Check reward after verifying
+    const rewardAfter = await questionManagerContract.read.getReward([token]);
+    expect(rewardAfter.value).to.equal(0n);
+    expect(rewardAfter.sent).to.equal(true);
+  });
+
   it("Should ask and cancel a question", async function () {
     const {
       publicClient,
