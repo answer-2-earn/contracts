@@ -14,7 +14,11 @@ async function main() {
     console.log(`Contract 'Question' deployed: ${await question.getAddress()}`);
   }
 
-  if (!CONTRACTS[network].questionManager && CONTRACTS[network].question) {
+  if (
+    !CONTRACTS[network].questionManager &&
+    !CONTRACTS[network].questionManagerImpl &&
+    CONTRACTS[network].question
+  ) {
     // Deploy question manager contract
     console.log(`Deploying 'QuestionManager' contract...`);
     const questionManagerFactory = await hre.ethers.getContractFactory(
@@ -38,6 +42,22 @@ async function main() {
     );
     await question.transferOwnership(await questionManager.getAddress());
     console.log(`Ownership of 'Question' contract transferred`);
+  }
+
+  if (
+    CONTRACTS[network].questionManager &&
+    !CONTRACTS[network].questionManagerImpl
+  ) {
+    console.log("Upgrading 'QuestionManager' contract...");
+    const questionManagerFactory = await hre.ethers.getContractFactory(
+      "QuestionManager"
+    );
+    const questionManager = await hre.upgrades.upgradeProxy(
+      CONTRACTS[network].questionManager,
+      questionManagerFactory
+    );
+    await questionManager.waitForDeployment();
+    console.log("Contract 'QuestionManager' upgraded");
   }
 }
 
