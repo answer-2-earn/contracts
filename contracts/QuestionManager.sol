@@ -17,6 +17,11 @@ contract QuestionManager is
         bool sent;
     }
 
+    struct Verification {
+        bool verified;
+        bool status;
+    }
+
     event QuestionAsked(
         address indexed asker,
         address indexed answerer,
@@ -43,6 +48,7 @@ contract QuestionManager is
     address public verifier;
     mapping(bytes32 tokenId => Reward) public rewards;
     mapping(bytes32 tokenId => address) public askers;
+    mapping(bytes32 tokenId => Verification) public verifications;
 
     function initialize(
         address questionAddress,
@@ -101,6 +107,9 @@ contract QuestionManager is
         // Update the metadata for the token
         question.setDataForTokenId(tokenId, _LSP4_METADATA_KEY, metadataValue);
 
+        // Reset the verification status
+        verifications[tokenId] = Verification({verified: false, status: false});
+
         emit QuestionAnswered(
             question.tokenOwnerOf(tokenId),
             tokenId,
@@ -135,6 +144,9 @@ contract QuestionManager is
         require(verifier == msg.sender, "Only verifier can verify");
         require(!rewards[tokenId].sent, "Reward already sent");
 
+        // Update the verification status
+        verifications[tokenId] = Verification({verified: true, status: status});
+
         if (status) {
             // Update the state before external call
             rewards[tokenId].sent = true;
@@ -162,6 +174,12 @@ contract QuestionManager is
      */
     function getReward(bytes32 tokenId) public view returns (Reward memory) {
         return rewards[tokenId];
+    }
+
+    function getVerification(
+        bytes32 tokenId
+    ) public view returns (Verification memory) {
+        return verifications[tokenId];
     }
 
     /**
