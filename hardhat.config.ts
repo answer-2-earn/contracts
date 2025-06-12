@@ -16,6 +16,9 @@ const config: HardhatUserConfig = {
       viaIR: true,
     },
   },
+  sourcify: {
+    enabled: false,
+  },
   networks: {
     luksoTestnet: {
       url: "https://rpc.testnet.lukso.network",
