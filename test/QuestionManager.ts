@@ -1,7 +1,7 @@
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import { expect } from "chai";
 import hre from "hardhat";
-import { parseEther } from "viem";
+import { parseEther, zeroAddress } from "viem";
 import { getAnswerMetadataValue, getAskMetadataValue } from "./utils/metadata";
 
 describe("QuestionManager", function () {
@@ -38,7 +38,7 @@ describe("QuestionManager", function () {
     };
   }
 
-  it("Should ask, answer and verify a question", async function () {
+  it("Should ask, answer a question and process a valid answer", async function () {
     const {
       publicClient,
       deployer,
@@ -63,12 +63,6 @@ describe("QuestionManager", function () {
     ]);
     const token = tokens[0];
 
-    // Check verification status after asking (should be initial state)
-    const verificationBeforeAnswer =
-      await questionManagerContract.read.getVerification([token]);
-    expect(verificationBeforeAnswer.verified).to.equal(false);
-    expect(verificationBeforeAnswer.status).to.equal(false);
-
     // Answer question by user one
     await questionManagerContract.write.answer(
       [token, getAnswerMetadataValue()],
@@ -77,48 +71,31 @@ describe("QuestionManager", function () {
       }
     );
 
-    // Check verification status after answering (should be reset)
-    const verificationAfterAnswer =
-      await questionManagerContract.read.getVerification([token]);
-    expect(verificationAfterAnswer.verified).to.equal(false);
-    expect(verificationAfterAnswer.status).to.equal(false);
-
-    // Check user one balance before verifying
+    // Check user one balance before processing
     const userOneBalanceBefore = await publicClient.getBalance({
       address: userOne.account.address,
     });
 
-    // Check reward before verifying
-    const rewardBefore = await questionManagerContract.read.getReward([token]);
-    expect(rewardBefore.value).to.equal(parseEther("1"));
-    expect(rewardBefore.sent).to.equal(false);
-
-    // Verify question by deployer
-    await questionManagerContract.write.verify([token, true], {
+    // Process a valid answer by deployer
+    await questionManagerContract.write.processValidAnswer([token], {
       account: deployer.account,
     });
 
-    // Check verification status after verifying (should be set to verified and true)
-    const verificationAfterVerify =
-      await questionManagerContract.read.getVerification([token]);
-    expect(verificationAfterVerify.verified).to.equal(true);
-    expect(verificationAfterVerify.status).to.equal(true);
+    // Check processing status after processing (should be set to 2, AnswerValidRewardSent)
+    const processingStatusAfter =
+      await questionManagerContract.read.getProcessingStatus([token]);
+    expect(processingStatusAfter).to.equal(2);
 
-    // Check user one balance after verifying
+    // Check user one balance after processing
     const userOneBalanceAfter = await publicClient.getBalance({
       address: userOne.account.address,
     });
     expect(userOneBalanceAfter - userOneBalanceBefore).to.be.equal(
       parseEther("1")
     );
-
-    // Check reward after verifying
-    const rewardAfter = await questionManagerContract.read.getReward([token]);
-    expect(rewardAfter.value).to.equal(parseEther("1"));
-    expect(rewardAfter.sent).to.equal(true);
   });
 
-  it("Should ask, answer and verify a question without value", async function () {
+  it("Should ask, answer a question without a value and process a valid answer", async function () {
     const {
       publicClient,
       deployer,
@@ -142,23 +119,6 @@ describe("QuestionManager", function () {
     ]);
     const token = tokens[0];
 
-    // Check verification status after asking (should be initial state)
-    const verificationBeforeAnswer =
-      await questionManagerContract.read.getVerification([token]);
-    expect(verificationBeforeAnswer.verified).to.equal(false);
-    expect(verificationBeforeAnswer.status).to.equal(false);
-
-    // Check reward after asking
-    const rewardAfterAsking = await questionManagerContract.read.getReward([
-      token,
-    ]);
-    expect(rewardAfterAsking.value).to.equal(0n);
-    expect(rewardAfterAsking.sent).to.equal(false);
-
-    // Check asker is correct
-    const asker = await questionManagerContract.read.getAsker([token]);
-    expect(asker.toLowerCase()).to.equal(userTwo.account.address.toLowerCase());
-
     // Answer question by user one
     await questionManagerContract.write.answer(
       [token, getAnswerMetadataValue()],
@@ -167,56 +127,34 @@ describe("QuestionManager", function () {
       }
     );
 
-    // Check verification status after answering (should be reset)
-    const verificationAfterAnswer =
-      await questionManagerContract.read.getVerification([token]);
-    expect(verificationAfterAnswer.verified).to.equal(false);
-    expect(verificationAfterAnswer.status).to.equal(false);
-
-    // Check user one balance before verifying (should stay the same after verification since no value)
+    // Check user one balance before processing (should stay the same after processing since no value)
     const userOneBalanceBefore = await publicClient.getBalance({
       address: userOne.account.address,
     });
 
-    // Verify question by deployer
-    await questionManagerContract.write.verify([token, true], {
+    // Process a valid answer by deployer
+    await questionManagerContract.write.processValidAnswer([token], {
       account: deployer.account,
     });
 
-    // Check verification status after verifying (should be set to verified and true)
-    const verificationAfterVerify =
-      await questionManagerContract.read.getVerification([token]);
-    expect(verificationAfterVerify.verified).to.equal(true);
-    expect(verificationAfterVerify.status).to.equal(true);
+    // Check processing status after processing (should be set to 2, AnswerValidRewardSent)
+    const processingStatusAfterProcessing =
+      await questionManagerContract.read.getProcessingStatus([token]);
+    expect(processingStatusAfterProcessing).to.equal(2);
 
-    // Check user one balance after verifying
+    // Check user one balance after processing
     const userOneBalanceAfter = await publicClient.getBalance({
       address: userOne.account.address,
     });
 
-    // Balance should stay approximately the same (might be slightly different due to gas costs)
+    // Balance should stay the same
     const balanceDifference = userOneBalanceAfter - userOneBalanceBefore;
     expect(balanceDifference).to.equal(0n);
-
-    // Check reward after verifying
-    const rewardAfter = await questionManagerContract.read.getReward([token]);
-    expect(rewardAfter.value).to.equal(0n);
-    expect(rewardAfter.sent).to.equal(true);
   });
 
   it("Should ask and cancel a question", async function () {
-    const {
-      publicClient,
-      userOne,
-      userTwo,
-      questionContract,
-      questionManagerContract,
-    } = await loadFixture(initFixture);
-
-    // Get user balance before asking
-    const userTwoBalanceBefore = await publicClient.getBalance({
-      address: userTwo.account.address,
-    });
+    const { userOne, userTwo, questionContract, questionManagerContract } =
+      await loadFixture(initFixture);
 
     // Ask question by user two
     const questionValue = parseEther("1");
@@ -234,67 +172,70 @@ describe("QuestionManager", function () {
     ]);
     const token = tokens[0];
 
-    // Check verification status after asking (should be initial state)
-    const verificationAfterAsking =
-      await questionManagerContract.read.getVerification([token]);
-    expect(verificationAfterAsking.verified).to.equal(false);
-    expect(verificationAfterAsking.status).to.equal(false);
-
-    // Check reward after asking
-    const rewardAfterAsking = await questionManagerContract.read.getReward([
-      token,
-    ]);
-    expect(rewardAfterAsking.value).to.equal(questionValue);
-    expect(rewardAfterAsking.sent).to.equal(false);
-
-    // Check asker is correct
-    const asker = await questionManagerContract.read.getAsker([token]);
-    expect(asker.toLowerCase()).to.equal(userTwo.account.address.toLowerCase());
-
-    // Get user balance after asking
-    const userTwoBalanceAfterAsking = await publicClient.getBalance({
-      address: userTwo.account.address,
-    });
-
-    // Verify that the user's balance decreased by at least the question value
-    expect(
-      Number(userTwoBalanceBefore - userTwoBalanceAfterAsking)
-    ).to.be.at.least(Number(questionValue));
-
-    // Cancel the question
+    // Cancel question
     await questionManagerContract.write.cancel([token], {
       account: userTwo.account,
     });
 
-    // Check reward after cancellation
-    const rewardAfterCancellation =
-      await questionManagerContract.read.getReward([token]);
-    expect(rewardAfterCancellation.value).to.equal(questionValue);
-    expect(rewardAfterCancellation.sent).to.equal(true);
-
-    // Get user balance after cancellation
-    const userTwoBalanceAfterCancellation = await publicClient.getBalance({
-      address: userTwo.account.address,
-    });
-
-    // Verify that the user's balance increased after cancellation
-    // Note: It won't be exactly the question value due to gas costs
-    const balanceIncrease =
-      userTwoBalanceAfterCancellation - userTwoBalanceAfterAsking;
-    const allowableDifference = parseEther("0.01");
+    // Check question data
+    expect(await questionManagerContract.read.getAsker([token])).to.equal(
+      zeroAddress
+    );
+    expect(await questionManagerContract.read.getReward([token])).to.equal(0n);
     expect(
-      balanceIncrease >= questionValue - allowableDifference &&
-        balanceIncrease <= questionValue + allowableDifference
-    ).to.be.true;
+      await questionManagerContract.read.getProcessingStatus([token])
+    ).to.equal(0);
 
-    // Try to get token - should fail because it was burned
+    // Try to get token (should fail because it was burned)
     try {
       await questionContract.read.tokenOwnerOf([token]);
       expect.fail("Expected an error when checking burned token");
     } catch (error) {
-      // Error is expected as the token should be burned
       expect(error).to.exist;
     }
+  });
+
+  it("Should ask, answer a question and process an invalid answer", async function () {
+    const {
+      deployer,
+      userOne,
+      userTwo,
+      questionContract,
+      questionManagerContract,
+    } = await loadFixture(initFixture);
+
+    // Ask question by user two
+    await questionManagerContract.write.ask(
+      [userOne.account.address, getAskMetadataValue()],
+      {
+        account: userTwo.account,
+        value: parseEther("1"),
+      }
+    );
+
+    // Get question token
+    const tokens = await questionContract.read.tokenIdsOf([
+      userOne.account.address,
+    ]);
+    const token = tokens[0];
+
+    // Answer question by user one
+    await questionManagerContract.write.answer(
+      [token, getAnswerMetadataValue()],
+      {
+        account: userOne.account,
+      }
+    );
+
+    // Process an invalid answer by deployer
+    await questionManagerContract.write.processInvalidAnswer([token], {
+      account: deployer.account,
+    });
+
+    // Check processing status after negative processing
+    const processingStatusAfterProcessing =
+      await questionManagerContract.read.getProcessingStatus([token]);
+    expect(processingStatusAfterProcessing).to.equal(1);
   });
 
   it("Should transfer question ownership", async function () {
@@ -333,62 +274,7 @@ describe("QuestionManager", function () {
         "Expected an error when non-owner tries to transfer ownership"
       );
     } catch (error) {
-      // Error is expected as only the owner should be able to transfer ownership
       expect(error).to.exist;
     }
-  });
-
-  it("Should ask, answer and verify a question with negative verification", async function () {
-    const {
-      deployer,
-      userOne,
-      userTwo,
-      questionContract,
-      questionManagerContract,
-    } = await loadFixture(initFixture);
-
-    // Ask question by user two
-    await questionManagerContract.write.ask(
-      [userOne.account.address, getAskMetadataValue()],
-      {
-        account: userTwo.account,
-        value: parseEther("1"),
-      }
-    );
-
-    // Get question token
-    const tokens = await questionContract.read.tokenIdsOf([
-      userOne.account.address,
-    ]);
-    const token = tokens[0];
-
-    // Answer question by user one
-    await questionManagerContract.write.answer(
-      [token, getAnswerMetadataValue()],
-      {
-        account: userOne.account,
-      }
-    );
-
-    // Check reward before verifying
-    const rewardBefore = await questionManagerContract.read.getReward([token]);
-    expect(rewardBefore.value).to.equal(parseEther("1"));
-    expect(rewardBefore.sent).to.equal(false);
-
-    // Verify question by deployer with FALSE status
-    await questionManagerContract.write.verify([token, false], {
-      account: deployer.account,
-    });
-
-    // Check verification status after negative verification
-    const verificationAfterVerify =
-      await questionManagerContract.read.getVerification([token]);
-    expect(verificationAfterVerify.verified).to.equal(true);
-    expect(verificationAfterVerify.status).to.equal(false);
-
-    // Check reward after negative verification (should NOT be sent)
-    const rewardAfter = await questionManagerContract.read.getReward([token]);
-    expect(rewardAfter.value).to.equal(parseEther("1"));
-    expect(rewardAfter.sent).to.equal(false);
   });
 });

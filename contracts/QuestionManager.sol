@@ -12,14 +12,10 @@ contract QuestionManager is
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable
 {
-    struct Reward {
-        uint256 value;
-        bool sent;
-    }
-
-    struct Verification {
-        bool verified;
-        bool status;
+    enum QuestionProcessingStatus {
+        None,
+        AnswerInvalid,
+        AnswerValidRewardSent
     }
 
     event QuestionAsked(
@@ -36,38 +32,68 @@ contract QuestionManager is
         bytes metadataValue
     );
 
-    event QuestionCancelled(
-        address indexed asker,
+    event QuestionCancelled(address indexed asker, bytes32 indexed tokenId);
+
+    event QuestionProcessed(
         bytes32 indexed tokenId,
-        uint256 reward
+        QuestionProcessingStatus status
     );
 
-    event QuestionVerified(bytes32 indexed tokenId, bool success);
-
     Question public question;
-    address public verifier;
-    mapping(bytes32 tokenId => Reward) public rewards;
+    address public validator;
+    mapping(bytes32 tokenId => uint256) public rewards;
     mapping(bytes32 tokenId => address) public askers;
-    mapping(bytes32 tokenId => Verification) public verifications;
+    mapping(bytes32 tokenId => QuestionProcessingStatus)
+        public processingStatuses;
+
+    modifier onlyValidator() {
+        require(validator == msg.sender, "Caller is not the validator");
+        _;
+    }
+
+    modifier onlyAnswerer(bytes32 tokenId) {
+        require(
+            question.tokenOwnerOf(tokenId) == msg.sender,
+            "Caller is not the answerer"
+        );
+        _;
+    }
+
+    modifier onlyAsker(bytes32 tokenId) {
+        require(askers[tokenId] == msg.sender, "Caller is not the asker");
+        _;
+    }
+
+    modifier onlyNotProcessed(bytes32 tokenId) {
+        require(
+            processingStatuses[tokenId] == QuestionProcessingStatus.None,
+            "Processing status is not None"
+        );
+        _;
+    }
+
+    modifier onlyNotProcessedAsAnswerValidRewardSent(bytes32 tokenId) {
+        require(
+            processingStatuses[tokenId] !=
+                QuestionProcessingStatus.AnswerValidRewardSent,
+            "Processing status is AnswerValidRewardSent"
+        );
+        _;
+    }
 
     function initialize(
         address questionAddress,
-        address verifierAddress
+        address validatorAddress
     ) public initializer {
         __Ownable_init();
         __ReentrancyGuard_init();
         question = Question(payable(questionAddress));
-        verifier = verifierAddress;
+        validator = validatorAddress;
     }
 
-    /**
-     * @dev Ask a question to a specific answerer with a reward.
-     * @param answerer The address of the person who should answer the question.
-     * @param metadataValue The metadata of the question being asked.
-     */
     function ask(address answerer, bytes memory metadataValue) public payable {
         require(answerer != address(0), "Answerer cannot be zero address");
-        require(answerer != msg.sender, "Cannot ask yourself");
+        require(answerer != msg.sender, "Answerer cannot ask yourself");
 
         // Mint a new token for the question
         bytes32 tokenId = keccak256(
@@ -82,7 +108,7 @@ contract QuestionManager is
         question.setDataForTokenId(tokenId, _LSP4_METADATA_KEY, metadataValue);
 
         // Store the reward and asker information
-        rewards[tokenId] = Reward({value: msg.value, sent: false});
+        rewards[tokenId] = msg.value;
         askers[tokenId] = msg.sender;
 
         emit QuestionAsked(
@@ -97,18 +123,17 @@ contract QuestionManager is
     function answer(
         bytes32 tokenId,
         bytes memory metadataValue
-    ) public nonReentrant {
-        require(
-            question.tokenOwnerOf(tokenId) == msg.sender,
-            "Only answerer can answer"
-        );
-        require(!rewards[tokenId].sent, "Reward already sent");
-
+    )
+        public
+        nonReentrant
+        onlyAnswerer(tokenId)
+        onlyNotProcessedAsAnswerValidRewardSent(tokenId)
+    {
         // Update the metadata for the token
         question.setDataForTokenId(tokenId, _LSP4_METADATA_KEY, metadataValue);
 
-        // Reset the verification status
-        verifications[tokenId] = Verification({verified: false, status: false});
+        // Reset the answer status
+        processingStatuses[tokenId] = QuestionProcessingStatus.None;
 
         emit QuestionAnswered(
             question.tokenOwnerOf(tokenId),
@@ -117,77 +142,75 @@ contract QuestionManager is
         );
     }
 
-    /**
-     * @dev Cancel a question and reclaim the reward before it's answered.
-     * @param tokenId The ID of the question token.
-     */
-    function cancel(bytes32 tokenId) public nonReentrant {
-        require(askers[tokenId] == msg.sender, "Only asker can cancel");
-        require(!rewards[tokenId].sent, "Reward already sent");
+    function cancel(
+        bytes32 tokenId
+    )
+        public
+        nonReentrant
+        onlyAsker(tokenId)
+        onlyNotProcessedAsAnswerValidRewardSent(tokenId)
+    {
+        uint256 reward = rewards[tokenId];
 
-        uint256 rewardValue = rewards[tokenId].value;
+        // Reset the data
+        rewards[tokenId] = 0;
+        askers[tokenId] = address(0);
+        processingStatuses[tokenId] = QuestionProcessingStatus.None;
 
-        // Mark the reward as sent to prevent double-claiming
-        rewards[tokenId].sent = true;
-
-        // Transfer the reward back to the asker
-        (bool success, ) = msg.sender.call{value: rewardValue}("");
+        // Transfer the reward to the asker
+        (bool success, ) = msg.sender.call{value: reward}("");
         require(success, "Transfer failed");
 
         // Burn the token
         question.burn(tokenId, "");
 
-        emit QuestionCancelled(msg.sender, tokenId, rewardValue);
+        emit QuestionCancelled(msg.sender, tokenId);
     }
 
-    function verify(bytes32 tokenId, bool status) public nonReentrant {
-        require(verifier == msg.sender, "Only verifier can verify");
-        require(!rewards[tokenId].sent, "Reward already sent");
+    function processValidAnswer(
+        bytes32 tokenId
+    ) public nonReentrant onlyValidator onlyNotProcessed(tokenId) {
+        // Update the processing status
+        processingStatuses[tokenId] = QuestionProcessingStatus
+            .AnswerValidRewardSent;
 
-        // Update the verification status
-        verifications[tokenId] = Verification({verified: true, status: status});
-
-        if (status) {
-            // Update the state before external call
-            rewards[tokenId].sent = true;
-
-            // Transfer the reward to the answerer
+        // Send the reward to the answerer
+        if (rewards[tokenId] > 0) {
             (bool success, ) = question.tokenOwnerOf(tokenId).call{
-                value: rewards[tokenId].value
+                value: rewards[tokenId]
             }("");
             require(success, "Transfer failed");
-
-            emit QuestionVerified(tokenId, true);
-        } else {
-            emit QuestionVerified(tokenId, false);
         }
+
+        emit QuestionProcessed(
+            tokenId,
+            QuestionProcessingStatus.AnswerValidRewardSent
+        );
+    }
+
+    function processInvalidAnswer(
+        bytes32 tokenId
+    ) public nonReentrant onlyValidator onlyNotProcessed(tokenId) {
+        processingStatuses[tokenId] = QuestionProcessingStatus.AnswerInvalid;
+
+        emit QuestionProcessed(tokenId, QuestionProcessingStatus.AnswerInvalid);
     }
 
     function transferQuestionOwnership(address newOwner) public onlyOwner {
         question.transferOwnership(newOwner);
     }
 
-    /**
-     * @dev Get the reward information for a specific question.
-     * @param tokenId The ID of the question token.
-     * @return The reward struct containing value, sent status, and expiration time.
-     */
-    function getReward(bytes32 tokenId) public view returns (Reward memory) {
+    function getReward(bytes32 tokenId) public view returns (uint256) {
         return rewards[tokenId];
     }
 
-    function getVerification(
-        bytes32 tokenId
-    ) public view returns (Verification memory) {
-        return verifications[tokenId];
-    }
-
-    /**
-     * @dev Get the asker of a specific question.
-     * @param tokenId The ID of the question token.
-     * @return The address of the person who asked the question.
-     */
     function getAsker(bytes32 tokenId) public view returns (address) {
         return askers[tokenId];
+    }
+
+    function getProcessingStatus(
+        bytes32 tokenId
+    ) public view returns (QuestionProcessingStatus) {
+        return processingStatuses[tokenId];
     }
 }

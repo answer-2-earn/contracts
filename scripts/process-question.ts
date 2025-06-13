@@ -3,9 +3,10 @@ import { CONTRACTS } from "./data/deployed-contracts";
 
 const CONFIG_QUESTION_ID =
   "0xfe2f9b80d26c85d451ebd87b7f757358969d5f574f931b1ee163603bf9cd77b2";
+const CONFIG_QUESTION_ANSWER_VALID = true;
 
 async function main() {
-  console.log("Verifying question...");
+  console.log("Processing question...");
 
   // Get the contract address from the deployed contracts
   const network = hre.network.name;
@@ -23,9 +24,14 @@ async function main() {
     contractAddress
   );
 
-  // Call the verify function on the contract
-  await contract.write.verify([CONFIG_QUESTION_ID, true]);
-  console.log("Question verified");
+  // Call the process function on the contract
+  if (CONFIG_QUESTION_ANSWER_VALID) {
+    await contract.write.processValidAnswer([CONFIG_QUESTION_ID]);
+  } else {
+    await contract.write.processInvalidAnswer([CONFIG_QUESTION_ID]);
+  }
+
+  console.log("Question processed");
 }
 
 main().catch((error) => {
