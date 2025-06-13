@@ -15,9 +15,9 @@ async function main() {
   }
 
   if (
+    CONTRACTS[network].question &&
     !CONTRACTS[network].questionManager &&
-    !CONTRACTS[network].questionManagerImpl &&
-    CONTRACTS[network].question
+    !CONTRACTS[network].questionManagerImpl
   ) {
     // Deploy question manager contract
     console.log(`Deploying 'QuestionManager' contract...`);
