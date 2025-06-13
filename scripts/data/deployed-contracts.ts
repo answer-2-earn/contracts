@@ -8,9 +8,9 @@ export const CONTRACTS: {
   };
 } = {
   luksoTestnet: {
-    question: "0xA958c128203d2671636f8820E943640A097e6A60",
-    questionManager: "0xEDe254159220fEE61bC83FDa5A9f1EA5b510472e",
-    questionManagerImpl: "0xacaB8f2Cc52471B03CbD29a41F5fBD6185Cf5A5E",
+    question: "0x9B0A7945cae625db7C4f929bF00f74B2E807330d",
+    questionManager: "0x5775e553Cb55844A068E1B78fD46AE1cF587AF20",
+    questionManagerImpl: "0x0AE60415656dEF9C1e079bCc84443D282eDFD5ee",
   },
   luksoMainnet: {
     question: undefined,
