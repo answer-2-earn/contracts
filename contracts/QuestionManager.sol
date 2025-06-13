@@ -26,7 +26,7 @@ contract QuestionManager is
         address indexed asker,
         address indexed answerer,
         bytes32 indexed tokenId,
-        uint256 value,
+        uint256 reward,
         bytes metadataValue
     );
 
@@ -39,7 +39,7 @@ contract QuestionManager is
     event QuestionCancelled(
         address indexed asker,
         bytes32 indexed tokenId,
-        uint256 value
+        uint256 reward
     );
 
     event QuestionVerified(bytes32 indexed tokenId, bool success);
