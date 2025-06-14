@@ -16,6 +16,7 @@ const config: HardhatUserConfig = {
       viaIR: true,
     },
   },
+  defaultNetwork: "luksoTestnet",
   sourcify: {
     enabled: false,
   },
