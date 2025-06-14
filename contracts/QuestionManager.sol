@@ -43,6 +43,7 @@ contract QuestionManager is
     address public validator;
     mapping(bytes32 tokenId => uint256) public rewards;
     mapping(bytes32 tokenId => address) public askers;
+    mapping(bytes32 tokenId => bytes) public answers;
     mapping(bytes32 tokenId => QuestionProcessingStatus)
         public processingStatuses;
 
@@ -129,8 +130,8 @@ contract QuestionManager is
         onlyAnswerer(tokenId)
         onlyNotProcessedAsAnswerValidRewardSent(tokenId)
     {
-        // Update the metadata for the token
-        question.setDataForTokenId(tokenId, _LSP4_METADATA_KEY, metadataValue);
+        // Store the answer
+        answers[tokenId] = metadataValue;
 
         // Reset the answer status
         processingStatuses[tokenId] = QuestionProcessingStatus.None;
@@ -206,6 +207,10 @@ contract QuestionManager is
 
     function getAsker(bytes32 tokenId) public view returns (address) {
         return askers[tokenId];
+    }
+
+    function getAnswer(bytes32 tokenId) public view returns (bytes memory) {
+        return answers[tokenId];
     }
 
     function getProcessingStatus(
