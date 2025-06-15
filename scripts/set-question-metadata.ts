@@ -16,9 +16,9 @@ const CONFIG_METADATA = {
     images: [
       [
         {
-          width: 256,
-          height: 256,
-          url: "ipfs://bafkreiahpktywfs64j6fpdu7cyl4yifj4ivxvudge3zuv7sga6qh3x7h74",
+          width: 512,
+          height: 512,
+          url: "ipfs://bafkreiedefseafrpqw6kkq2sryaayhd5hcxsfebmlwwxpfpgc7vmsqkgbm",
         },
       ],
     ],
@@ -56,7 +56,9 @@ async function uploadMetadataToIpfs(metadata: object): Promise<string> {
     pinataJwt: process.env.PINATA_JWT,
     pinataGateway: "https://yellow-mute-echidna-168.mypinata.cloud/ipfs/",
   });
-  const upload = await pinata.upload.public.json(metadata);
+  const upload = await pinata.upload.public.json(metadata, {
+    groupId: "e4decc86-1ca1-4801-b733-8b0c0c0daa6d",
+  });
   return `ipfs://${upload.cid}`;
 }
 
