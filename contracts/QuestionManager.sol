@@ -201,6 +201,13 @@ contract QuestionManager is
         question.transferOwnership(newOwner);
     }
 
+    function setQuestionData(
+        bytes32 dataKey,
+        bytes memory dataValue
+    ) public onlyOwner {
+        question.setData(dataKey, dataValue);
+    }
+
     function getReward(bytes32 tokenId) public view returns (uint256) {
         return rewards[tokenId];
     }
