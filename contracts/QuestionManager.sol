@@ -156,6 +156,7 @@ contract QuestionManager is
         // Reset the data
         rewards[tokenId] = 0;
         askers[tokenId] = address(0);
+        answers[tokenId] = ""; // Clear the answers mapping
         processingStatuses[tokenId] = QuestionProcessingStatus.None;
 
         // Transfer the reward to the asker
