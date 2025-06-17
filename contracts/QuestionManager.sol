@@ -208,6 +208,10 @@ contract QuestionManager is
         question.setData(dataKey, dataValue);
     }
 
+    function setValidator(address newValidator) public onlyOwner {
+        validator = newValidator;
+    }
+
     function getReward(bytes32 tokenId) public view returns (uint256) {
         return rewards[tokenId];
     }
