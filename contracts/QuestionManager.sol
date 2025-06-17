@@ -4,13 +4,15 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {_LSP4_METADATA_KEY} from "@lukso/lsp-smart-contracts/contracts/LSP4DigitalAssetMetadata/LSP4Constants.sol";
 import {Question} from "./Question.sol";
 
 contract QuestionManager is
     Initializable,
     OwnableUpgradeable,
-    ReentrancyGuardUpgradeable
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
 {
     enum QuestionProcessingStatus {
         None,
@@ -88,11 +90,15 @@ contract QuestionManager is
     ) public initializer {
         __Ownable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
         question = Question(payable(questionAddress));
         validator = validatorAddress;
     }
 
-    function ask(address answerer, bytes memory metadataValue) public payable {
+    function ask(
+        address answerer,
+        bytes memory metadataValue
+    ) public payable whenNotPaused {
         require(answerer != address(0), "Answerer cannot be zero address");
         require(answerer != msg.sender, "Answerer cannot ask yourself");
 
@@ -127,6 +133,7 @@ contract QuestionManager is
     )
         public
         nonReentrant
+        whenNotPaused
         onlyAnswerer(tokenId)
         onlyNotProcessedAsAnswerValidRewardSent(tokenId)
     {
@@ -148,6 +155,7 @@ contract QuestionManager is
     )
         public
         nonReentrant
+        whenNotPaused
         onlyAsker(tokenId)
         onlyNotProcessedAsAnswerValidRewardSent(tokenId)
     {
@@ -171,7 +179,13 @@ contract QuestionManager is
 
     function processValidAnswer(
         bytes32 tokenId
-    ) public nonReentrant onlyValidator onlyNotProcessed(tokenId) {
+    )
+        public
+        nonReentrant
+        whenNotPaused
+        onlyValidator
+        onlyNotProcessed(tokenId)
+    {
         // Update the processing status
         processingStatuses[tokenId] = QuestionProcessingStatus
             .AnswerValidRewardSent;
@@ -192,10 +206,32 @@ contract QuestionManager is
 
     function processInvalidAnswer(
         bytes32 tokenId
-    ) public nonReentrant onlyValidator onlyNotProcessed(tokenId) {
+    )
+        public
+        nonReentrant
+        whenNotPaused
+        onlyValidator
+        onlyNotProcessed(tokenId)
+    {
         processingStatuses[tokenId] = QuestionProcessingStatus.AnswerInvalid;
 
         emit QuestionProcessed(tokenId, QuestionProcessingStatus.AnswerInvalid);
+    }
+
+    /**
+     * @notice Pauses all contract functions with the whenNotPaused modifier.
+     * @dev Can only be called by the contract owner.
+     */
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @notice Unpauses all contract functions with the whenNotPaused modifier.
+     * @dev Can only be called by the contract owner.
+     */
+    function unpause() public onlyOwner {
+        _unpause();
     }
 
     function transferQuestionOwnership(address newOwner) public onlyOwner {
