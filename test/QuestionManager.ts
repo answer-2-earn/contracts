@@ -384,8 +384,18 @@ describe("QuestionManager", function () {
 
   describe("Cancellation", function () {
     it("Should cancel a question", async function () {
-      const { asker, questionContract, questionManagerContract, token } =
-        await loadFixture(fixtureWithAskedQuestion);
+      const {
+        publicClient,
+        asker,
+        questionContract,
+        questionManagerContract,
+        token,
+      } = await loadFixture(fixtureWithAskedQuestion);
+
+      // Get asker balance before cancellation
+      const askerBalanceBefore = await publicClient.getBalance({
+        address: asker.account.address,
+      });
 
       // Cancel question
       await expect(
@@ -403,9 +413,56 @@ describe("QuestionManager", function () {
       expect(reward).to.equal(0n);
       expect(processingStatus).to.equal(0);
 
+      // Try to read token owner after cancellation
       await expect(questionContract.read.tokenOwnerOf([token])).to.rejectedWith(
         "LSP8NonExistentTokenId"
       );
+
+      // Check asker balance after cancellation (should increase by reward amount)
+      const askerBalanceAfter = await publicClient.getBalance({
+        address: asker.account.address,
+      });
+
+      // Account for gas costs by checking that balance increased by approximately the reward
+      // The final balance should be close to the initial balance plus the reward (accounting for gas costs)
+      const delta = askerBalanceAfter - askerBalanceBefore;
+
+      // The difference should be positive
+      expect(delta > 0n).to.be.true;
+
+      // Should be close to the reward amount (allowing for gas costs)
+      const minExpectedRefund = reward - parseEther("0.01");
+      expect(delta >= minExpectedRefund).to.be.true;
+    });
+
+    it("Should fail when cancelling by not asker", async function () {
+      const { answerer, questionManagerContract, token } = await loadFixture(
+        fixtureWithAskedQuestion
+      );
+
+      // Try to cancel the question as the answerer (not the asker)
+      await expect(
+        questionManagerContract.write.cancel([token], {
+          account: answerer.account,
+        })
+      ).to.rejectedWith("Caller is not the asker");
+    });
+
+    it("Should fail when cancelling a processed question", async function () {
+      const { asker, deployer, questionManagerContract, token } =
+        await loadFixture(fixtureWithAnsweredQuestion);
+
+      // Process the answer as valid
+      await questionManagerContract.write.processValidAnswer([token], {
+        account: deployer.account,
+      });
+
+      // Try to cancel the question after processing
+      await expect(
+        questionManagerContract.write.cancel([token], {
+          account: asker.account,
+        })
+      ).to.rejectedWith("Processing status is AnswerValidRewardSent");
     });
   });
 
