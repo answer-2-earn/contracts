@@ -107,6 +107,7 @@ describe("QuestionManager", function () {
       reward,
     };
   }
+
   describe("Asking", function () {
     it("Should ask a question with a reward", async function () {
       const {
@@ -216,7 +217,7 @@ describe("QuestionManager", function () {
       expect(contractBalanceAfter).to.equal(contractBalanceBefore);
     });
 
-    it("Should fail if a question asked to yourself", async function () {
+    it("Should fail when asking a question to yourself", async function () {
       const { userOne, questionManagerContract } = await loadFixture(
         initFixture
       );
@@ -233,22 +234,44 @@ describe("QuestionManager", function () {
   });
 
   describe("Answering", function () {
-    it("Should answer a question by answerer", async function () {
+    it("Should answer by answerer", async function () {
       const { answerer, questionManagerContract, token } = await loadFixture(
         fixtureWithAskedQuestion
       );
 
+      // Check processing status before answering
+      const processingStatusBefore =
+        await questionManagerContract.read.getProcessingStatus([token]);
+      expect(processingStatusBefore).to.equal(0); // Should be None initially
+
+      // No answer data before answering
+      const answerBefore = await questionManagerContract.read.getAnswer([
+        token,
+      ]);
+      expect(answerBefore).to.equal("0x"); // Empty bytes
+
+      const metadata = getAnswerMetadataValue();
+
+      // Answer the question
       await expect(
-        questionManagerContract.write.answer(
-          [token, getAnswerMetadataValue()],
-          {
-            account: answerer.account,
-          }
-        )
+        questionManagerContract.write.answer([token, metadata], {
+          account: answerer.account,
+        })
       ).to.not.rejected;
+
+      // Verify the answer metadata is correctly stored
+      const storedAnswer = await questionManagerContract.read.getAnswer([
+        token,
+      ]);
+      expect(storedAnswer).to.equal(metadata);
+
+      // Processing status should still be None after answering (until processed)
+      const processingStatusAfter =
+        await questionManagerContract.read.getProcessingStatus([token]);
+      expect(processingStatusAfter).to.equal(0); // Still None until processed
     });
 
-    it("Should fail if a question answered by not answerer", async function () {
+    it("Should fail when answering by not answerer", async function () {
       const { asker, questionManagerContract, token } = await loadFixture(
         fixtureWithAskedQuestion
       );
@@ -261,6 +284,46 @@ describe("QuestionManager", function () {
           }
         )
       ).to.rejectedWith("Caller is not the answerer");
+    });
+
+    it("Should fail when answering a cancelled question", async function () {
+      const { answerer, asker, questionManagerContract, token } =
+        await loadFixture(fixtureWithAskedQuestion);
+
+      // Cancel the question first
+      await questionManagerContract.write.cancel([token], {
+        account: asker.account,
+      });
+
+      // Try to answer the cancelled question
+      await expect(
+        questionManagerContract.write.answer(
+          [token, getAnswerMetadataValue()],
+          {
+            account: answerer.account,
+          }
+        )
+      ).to.rejectedWith(`LSP8NonExistentTokenId("${token}")`);
+    });
+
+    it("Should fail when answering a processed question", async function () {
+      const { answerer, deployer, questionManagerContract, token } =
+        await loadFixture(fixtureWithAnsweredQuestion);
+
+      // Process the answer as valid
+      await questionManagerContract.write.processValidAnswer([token], {
+        account: deployer.account,
+      });
+
+      // Try to answer again after processing
+      await expect(
+        questionManagerContract.write.answer(
+          [token, getAnswerMetadataValue()],
+          {
+            account: answerer.account,
+          }
+        )
+      ).to.rejectedWith("Processing status is AnswerValidRewardSent");
     });
   });
 
@@ -340,13 +403,9 @@ describe("QuestionManager", function () {
       expect(reward).to.equal(0n);
       expect(processingStatus).to.equal(0);
 
-      // Try to get token
-      try {
-        await questionContract.read.tokenOwnerOf([token]);
-        expect.fail("Expected an error when checking burned token");
-      } catch (error) {
-        expect(error).to.exist;
-      }
+      await expect(questionContract.read.tokenOwnerOf([token])).to.rejectedWith(
+        "LSP8NonExistentTokenId"
+      );
     });
   });
 
@@ -375,20 +434,15 @@ describe("QuestionManager", function () {
         userOne.account.address.toLowerCase()
       );
 
-      // Attempt to transfer ownership with a non-owner account (should fail)
-      try {
-        await questionManagerContract.write.transferQuestionOwnership(
+      // Attempt to transfer ownership with a non-owner account
+      await expect(
+        questionManagerContract.write.transferQuestionOwnership(
           [deployer.account.address],
           {
             account: userOne.account,
           }
-        );
-        expect.fail(
-          "Expected an error when non-owner tries to transfer ownership"
-        );
-      } catch (error) {
-        expect(error).to.exist;
-      }
+        )
+      ).to.rejectedWith("Ownable: caller is not the owner");
     });
   });
 });
