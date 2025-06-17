@@ -1,7 +1,7 @@
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import { expect } from "chai";
 import hre from "hardhat";
-import { Account, Hex, parseEther, zeroAddress } from "viem";
+import { parseEther, zeroAddress } from "viem";
 import { getAnswerMetadataValue, getAskMetadataValue } from "./utils/metadata";
 
 describe("QuestionManager", function () {
@@ -38,121 +38,91 @@ describe("QuestionManager", function () {
     };
   }
 
-  async function askQuestion(
-    answererAccount: Account,
-    askerAccount: Account,
-    reward: bigint,
-    metadataValue: Hex,
-    questionManagerContractAddress: `0x${string}`
-  ) {
-    const questionManagerContract = await hre.viem.getContractAt(
-      "QuestionManager",
-      questionManagerContractAddress
-    );
-    if (reward === 0n) {
-      return questionManagerContract.write.ask(
-        [answererAccount.address, metadataValue],
-        {
-          account: askerAccount,
-        }
-      );
-    } else {
-      return questionManagerContract.write.ask(
-        [answererAccount.address, metadataValue],
-        {
-          account: askerAccount,
-          value: reward,
-        }
-      );
-    }
-  }
+  async function fixtureWithAskedQuestion() {
+    const {
+      publicClient,
+      deployer,
+      userOne,
+      userTwo,
+      questionContract,
+      questionManagerContract,
+    } = await loadFixture(initFixture);
 
-  async function cancelQuestion(
-    askerAccount: Account,
-    token: `0x${string}`,
-    questionManagerContractAddress: `0x${string}`
-  ) {
-    const questionManagerContract = await hre.viem.getContractAt(
-      "QuestionManager",
-      questionManagerContractAddress
-    );
-    return questionManagerContract.write.cancel([token], {
-      account: askerAccount,
-    });
-  }
+    const answerer = userOne;
+    const asker = userTwo;
+    const reward = parseEther("1");
 
-  async function answerQuestion(
-    answererAccount: Account,
-    token: `0x${string}`,
-    metadataValue: Hex,
-    questionManagerContractAddress: `0x${string}`
-  ) {
-    const questionManagerContract = await hre.viem.getContractAt(
-      "QuestionManager",
-      questionManagerContractAddress
+    await questionManagerContract.write.ask(
+      [answerer.account.address, getAskMetadataValue()],
+      {
+        account: asker.account,
+        value: reward,
+      }
     );
-    return questionManagerContract.write.answer([token, metadataValue], {
-      account: answererAccount,
-    });
-  }
 
-  async function processValidAnswer(
-    deployerAccount: Account,
-    token: `0x${string}`,
-    questionManagerContractAddress: `0x${string}`
-  ) {
-    const questionManagerContract = await hre.viem.getContractAt(
-      "QuestionManager",
-      questionManagerContractAddress
-    );
-    await questionManagerContract.write.processValidAnswer([token], {
-      account: deployerAccount,
-    });
-  }
-
-  async function processInvalidAnswer(
-    deployerAccount: Account,
-    token: `0x${string}`,
-    questionManagerContractAddress: `0x${string}`
-  ) {
-    const questionManagerContract = await hre.viem.getContractAt(
-      "QuestionManager",
-      questionManagerContractAddress
-    );
-    await questionManagerContract.write.processInvalidAnswer([token], {
-      account: deployerAccount,
-    });
-  }
-
-  async function getFirstToken(
-    answererAccount: Account,
-    questionContractAddress: `0x${string}`
-  ) {
-    const questionContract = await hre.viem.getContractAt(
-      "Question",
-      questionContractAddress
-    );
     const tokens = await questionContract.read.tokenIdsOf([
-      answererAccount.address,
+      userOne.account.address,
     ]);
-    return tokens[0];
+    const token = tokens[0];
+
+    return {
+      publicClient,
+      deployer,
+      answerer,
+      asker,
+      questionContract,
+      questionManagerContract,
+      token,
+      reward,
+    };
+  }
+
+  async function fixtureWithAnsweredQuestion() {
+    const {
+      publicClient,
+      deployer,
+      answerer,
+      asker,
+      questionContract,
+      questionManagerContract,
+      token,
+      reward,
+    } = await loadFixture(fixtureWithAskedQuestion);
+
+    await questionManagerContract.write.answer(
+      [token, getAnswerMetadataValue()],
+      {
+        account: answerer.account,
+      }
+    );
+
+    return {
+      publicClient,
+      deployer,
+      answerer,
+      asker,
+      questionContract,
+      questionManagerContract,
+      token,
+      reward,
+    };
   }
 
   describe("Asking", function () {
     // TODO: Check balance
     // TODO: Check data
-    it("Should ask a question", async function () {
+    it("Should ask a question with a reward", async function () {
       const { userOne, userTwo, questionManagerContract } = await loadFixture(
         initFixture
       );
 
       await expect(
-        askQuestion(
-          userOne.account,
-          userTwo.account,
-          parseEther("1"),
-          getAskMetadataValue(),
-          questionManagerContract.address
+        questionManagerContract.write.ask(
+          [userOne.account.address, getAskMetadataValue()],
+          {
+            account: userTwo.account,
+            value: parseEther("1"),
+          }
         )
       ).to.not.rejected;
     });
@@ -163,12 +133,11 @@ describe("QuestionManager", function () {
       );
 
       await expect(
-        askQuestion(
-          userOne.account,
-          userTwo.account,
-          parseEther("0"),
-          getAskMetadataValue(),
-          questionManagerContract.address
+        questionManagerContract.write.ask(
+          [userOne.account.address, getAskMetadataValue()],
+          {
+            account: userTwo.account,
+          }
         )
       ).to.not.rejected;
     });
@@ -179,12 +148,11 @@ describe("QuestionManager", function () {
       );
 
       await expect(
-        askQuestion(
-          userOne.account,
-          userOne.account,
-          parseEther("1"),
-          getAskMetadataValue(),
-          questionManagerContract.address
+        questionManagerContract.write.ask(
+          [userOne.account.address, getAskMetadataValue()],
+          {
+            account: userOne.account,
+          }
         )
       ).to.rejectedWith("Answerer cannot ask yourself");
     });
@@ -192,55 +160,31 @@ describe("QuestionManager", function () {
 
   describe("Answering", function () {
     it("Should answer a question by answerer", async function () {
-      const { userOne, userTwo, questionContract, questionManagerContract } =
-        await loadFixture(initFixture);
-
-      await askQuestion(
-        userOne.account,
-        userTwo.account,
-        parseEther("1"),
-        getAskMetadataValue(),
-        questionManagerContract.address
-      );
-
-      const token = await getFirstToken(
-        userOne.account,
-        questionContract.address
+      const { answerer, questionManagerContract, token } = await loadFixture(
+        fixtureWithAskedQuestion
       );
 
       await expect(
-        answerQuestion(
-          userOne.account,
-          token,
-          getAnswerMetadataValue(),
-          questionManagerContract.address
+        questionManagerContract.write.answer(
+          [token, getAnswerMetadataValue()],
+          {
+            account: answerer.account,
+          }
         )
       ).to.not.rejected;
     });
 
     it("Should fail if a question answered by not answerer", async function () {
-      const { userOne, userTwo, questionContract, questionManagerContract } =
-        await loadFixture(initFixture);
-
-      await askQuestion(
-        userOne.account,
-        userTwo.account,
-        parseEther("1"),
-        getAskMetadataValue(),
-        questionManagerContract.address
-      );
-
-      const token = await getFirstToken(
-        userOne.account,
-        questionContract.address
+      const { asker, questionManagerContract, token } = await loadFixture(
+        fixtureWithAskedQuestion
       );
 
       await expect(
-        answerQuestion(
-          userTwo.account,
-          token,
-          getAnswerMetadataValue(),
-          questionManagerContract.address
+        questionManagerContract.write.answer(
+          [token, getAnswerMetadataValue()],
+          {
+            account: asker.account,
+          }
         )
       ).to.rejectedWith("Caller is not the answerer");
     });
@@ -251,44 +195,21 @@ describe("QuestionManager", function () {
       const {
         publicClient,
         deployer,
-        userOne,
-        userTwo,
-        questionContract,
+        answerer,
         questionManagerContract,
-      } = await loadFixture(initFixture);
-
-      await askQuestion(
-        userOne.account,
-        userTwo.account,
-        parseEther("1"),
-        getAskMetadataValue(),
-        questionManagerContract.address
-      );
-
-      const token = await getFirstToken(
-        userOne.account,
-        questionContract.address
-      );
-
-      await answerQuestion(
-        userOne.account,
         token,
-        getAnswerMetadataValue(),
-        questionManagerContract.address
-      );
+      } = await loadFixture(fixtureWithAnsweredQuestion);
 
-      // Get user one balance before processing
-      const userOneBalanceBefore = await publicClient.getBalance({
-        address: userOne.account.address,
+      // Get answerer balance before processing
+      const answererBalanceBefore = await publicClient.getBalance({
+        address: answerer.account.address,
       });
 
       // Process a valid answer
       await expect(
-        processValidAnswer(
-          deployer.account,
-          token,
-          questionManagerContract.address
-        )
+        questionManagerContract.write.processValidAnswer([token], {
+          account: deployer.account,
+        })
       ).to.not.rejected;
 
       // Check processing status after processing
@@ -296,51 +217,25 @@ describe("QuestionManager", function () {
         await questionManagerContract.read.getProcessingStatus([token]);
       expect(processingStatusAfter).to.equal(2);
 
-      // Check user one balance after processing
-      const userOneBalanceAfter = await publicClient.getBalance({
-        address: userOne.account.address,
+      // Check answerer balance after processing
+      const answererBalanceAfter = await publicClient.getBalance({
+        address: answerer.account.address,
       });
-      expect(userOneBalanceAfter - userOneBalanceBefore).to.be.equal(
+      expect(answererBalanceAfter - answererBalanceBefore).to.be.equal(
         parseEther("1")
       );
     });
 
     it("Should process an invalid answer", async function () {
-      const {
-        deployer,
-        userOne,
-        userTwo,
-        questionContract,
-        questionManagerContract,
-      } = await loadFixture(initFixture);
-
-      await askQuestion(
-        userOne.account,
-        userTwo.account,
-        parseEther("1"),
-        getAskMetadataValue(),
-        questionManagerContract.address
-      );
-
-      const token = await getFirstToken(
-        userOne.account,
-        questionContract.address
-      );
-
-      await answerQuestion(
-        userOne.account,
-        token,
-        getAnswerMetadataValue(),
-        questionManagerContract.address
+      const { deployer, questionManagerContract, token } = await loadFixture(
+        fixtureWithAnsweredQuestion
       );
 
       // Process an invalid answer
       await expect(
-        processInvalidAnswer(
-          deployer.account,
-          token,
-          questionManagerContract.address
-        )
+        questionManagerContract.write.processInvalidAnswer([token], {
+          account: deployer.account,
+        })
       ).to.not.rejected;
 
       // Check processing status after processing
@@ -352,33 +247,22 @@ describe("QuestionManager", function () {
 
   describe("Cancellation", function () {
     it("Should cancel a question", async function () {
-      const { userOne, userTwo, questionContract, questionManagerContract } =
-        await loadFixture(initFixture);
-
-      await askQuestion(
-        userOne.account,
-        userTwo.account,
-        parseEther("1"),
-        getAskMetadataValue(),
-        questionManagerContract.address
-      );
-
-      const token = await getFirstToken(
-        userOne.account,
-        questionContract.address
-      );
+      const { asker, questionContract, questionManagerContract, token } =
+        await loadFixture(fixtureWithAskedQuestion);
 
       // Cancel question
       await expect(
-        cancelQuestion(userTwo.account, token, questionManagerContract.address)
+        questionManagerContract.write.cancel([token], {
+          account: asker.account,
+        })
       ).to.not.rejected;
 
       // Check question data
-      const asker = await questionManagerContract.read.getAsker([token]);
+      const askerAddress = await questionManagerContract.read.getAsker([token]);
       const reward = await questionManagerContract.read.getReward([token]);
       const processingStatus =
         await questionManagerContract.read.getProcessingStatus([token]);
-      expect(asker).to.equal(zeroAddress);
+      expect(askerAddress).to.equal(zeroAddress);
       expect(reward).to.equal(0n);
       expect(processingStatus).to.equal(0);
 
