@@ -4,7 +4,10 @@ import {
   fixtureWithAnsweredQuestion,
   fixtureWithAskedQuestion,
 } from "../fixtures/question-manager";
-import { getAnswerMetadataValue } from "../utils/metadata";
+import {
+  getAnswerMetadataValueOne,
+  getAnswerMetadataValueTwo,
+} from "../utils/metadata";
 
 describe("QuestionManager: Answering", function () {
   it("Should answer", async function () {
@@ -21,7 +24,7 @@ describe("QuestionManager: Answering", function () {
     const answerBefore = await questionManagerContract.read.getAnswer([token]);
     expect(answerBefore).to.equal("0x"); // Empty bytes
 
-    const metadata = getAnswerMetadataValue();
+    const metadata = getAnswerMetadataValueOne();
 
     // Answer the question
     await expect(
@@ -40,11 +43,80 @@ describe("QuestionManager: Answering", function () {
     expect(processingStatusAfter).to.equal(0); // Still None until processed
   });
 
-  // TODO:
-  it("Should answer if question answered and not processed", async function () {});
+  it("Should answer if question answered and not processed", async function () {
+    const { answerer, questionManagerContract, token } = await loadFixture(
+      fixtureWithAnsweredQuestion
+    );
 
-  // TODO:
-  it("Should answer if question processed as answer invalid", async function () {});
+    // Verify the current processing status is None
+    const processingStatusBefore =
+      await questionManagerContract.read.getProcessingStatus([token]);
+    expect(processingStatusBefore).to.equal(0); // None
+
+    // Get the original answer
+    const originalAnswer = await questionManagerContract.read.getAnswer([
+      token,
+    ]);
+
+    // Answer the question again with a different metadata
+    const newMetadata = getAnswerMetadataValueTwo();
+
+    await expect(
+      questionManagerContract.write.answer([token, newMetadata], {
+        account: answerer.account,
+      })
+    ).to.not.rejected;
+
+    // Verify the answer metadata is updated
+    const updatedAnswer = await questionManagerContract.read.getAnswer([token]);
+    expect(updatedAnswer).to.equal(newMetadata);
+    expect(updatedAnswer).to.not.equal(originalAnswer);
+
+    // Processing status should still be None after answering again
+    const processingStatusAfter =
+      await questionManagerContract.read.getProcessingStatus([token]);
+    expect(processingStatusAfter).to.equal(0); // Still None
+  });
+
+  it("Should answer if question processed as answer invalid", async function () {
+    const { answerer, deployer, questionManagerContract, token } =
+      await loadFixture(fixtureWithAnsweredQuestion);
+
+    // First, process the answer as invalid
+    await questionManagerContract.write.processInvalidAnswer([token], {
+      account: deployer.account,
+    });
+
+    // Verify the processing status is AnswerInvalid (1)
+    const processingStatusBefore =
+      await questionManagerContract.read.getProcessingStatus([token]);
+    expect(processingStatusBefore).to.equal(1); // AnswerInvalid
+
+    // Get the original answer
+    const originalAnswer = await questionManagerContract.read.getAnswer([
+      token,
+    ]);
+
+    // Provide a new answer after the question has been processed as invalid
+    const newMetadata = getAnswerMetadataValueTwo();
+
+    // Should be able to answer again
+    await expect(
+      questionManagerContract.write.answer([token, newMetadata], {
+        account: answerer.account,
+      })
+    ).to.not.rejected;
+
+    // Verify the answer was updated
+    const updatedAnswer = await questionManagerContract.read.getAnswer([token]);
+    expect(updatedAnswer).to.equal(newMetadata);
+    expect(updatedAnswer).to.not.equal(originalAnswer);
+
+    // The processing status should be reset to None (0) after answering again
+    const processingStatusAfter =
+      await questionManagerContract.read.getProcessingStatus([token]);
+    expect(processingStatusAfter).to.equal(0); // Reset to None
+  });
 
   it("Should fail if answering question processed as answer valid and reward sent", async function () {
     const { answerer, deployer, questionManagerContract, token } =
@@ -57,9 +129,12 @@ describe("QuestionManager: Answering", function () {
 
     // Try to answer again after processing
     await expect(
-      questionManagerContract.write.answer([token, getAnswerMetadataValue()], {
-        account: answerer.account,
-      })
+      questionManagerContract.write.answer(
+        [token, getAnswerMetadataValueOne()],
+        {
+          account: answerer.account,
+        }
+      )
     ).to.rejectedWith("Processing status is AnswerValidRewardSent");
   });
 
@@ -69,9 +144,12 @@ describe("QuestionManager: Answering", function () {
     );
 
     await expect(
-      questionManagerContract.write.answer([token, getAnswerMetadataValue()], {
-        account: asker.account,
-      })
+      questionManagerContract.write.answer(
+        [token, getAnswerMetadataValueOne()],
+        {
+          account: asker.account,
+        }
+      )
     ).to.rejectedWith("Caller is not the answerer");
   });
 
@@ -86,9 +164,12 @@ describe("QuestionManager: Answering", function () {
 
     // Try to answer the cancelled question
     await expect(
-      questionManagerContract.write.answer([token, getAnswerMetadataValue()], {
-        account: answerer.account,
-      })
+      questionManagerContract.write.answer(
+        [token, getAnswerMetadataValueOne()],
+        {
+          account: answerer.account,
+        }
+      )
     ).to.rejectedWith(`LSP8NonExistentTokenId("${token}")`);
   });
 });

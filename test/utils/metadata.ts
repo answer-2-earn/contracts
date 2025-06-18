@@ -13,13 +13,23 @@ export function getAskMetadataValue(): Hex {
   );
 }
 
-export function getAnswerMetadataValue(): Hex {
+export function getAnswerMetadataValueOne(): Hex {
   return getEncodedLSP4MetadataValue(
     {
       answer: "To travel the world",
       answerDate: 1746028080,
     },
-    "ipfs://answer"
+    "ipfs://answer_1"
+  );
+}
+
+export function getAnswerMetadataValueTwo(): Hex {
+  return getEncodedLSP4MetadataValue(
+    {
+      answer: "To travel the world and explore new cultures",
+      answerDate: 1746028080,
+    },
+    "ipfs://answer_2"
   );
 }
 

@@ -1,7 +1,10 @@
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import hre from "hardhat";
 import { parseEther } from "viem";
-import { getAnswerMetadataValue, getAskMetadataValue } from "../utils/metadata";
+import {
+  getAnswerMetadataValueOne,
+  getAskMetadataValue,
+} from "../utils/metadata";
 
 export async function initFixture() {
   // Get public client
@@ -124,7 +127,7 @@ export async function fixtureWithAnsweredQuestion() {
   } = await loadFixture(fixtureWithAskedQuestion);
 
   await questionManagerContract.write.answer(
-    [token, getAnswerMetadataValue()],
+    [token, getAnswerMetadataValueOne()],
     {
       account: answerer.account,
     }
@@ -154,7 +157,7 @@ export async function fixtureWithAnsweredZeroRewardQuestion() {
   } = await loadFixture(fixtureWithAskedZeroRewardQuestion);
 
   await questionManagerContract.write.answer(
-    [token, getAnswerMetadataValue()],
+    [token, getAnswerMetadataValueOne()],
     {
       account: answerer.account,
     }
