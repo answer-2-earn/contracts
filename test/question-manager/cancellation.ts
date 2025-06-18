@@ -127,7 +127,7 @@ describe("QuestionManager: Cancellation", function () {
     ).to.rejectedWith("Caller is not the asker");
   });
 
-  it("Should fail if cancelling a question processed as answer valid reward sent", async function () {
+  it("Should fail if cancelling a question processed as answer valid and reward sent", async function () {
     const { asker, deployer, questionManagerContract, token } =
       await loadFixture(fixtureWithAnsweredQuestion);
 
@@ -141,7 +141,7 @@ describe("QuestionManager: Cancellation", function () {
       questionManagerContract.write.cancel([token], {
         account: asker.account,
       })
-    ).to.rejectedWith("Processing status is AnswerValidRewardSent");
+    ).to.rejectedWith("Question processing status is 'AnswerValidRewardSent'");
   });
 
   it("Should fail if cancelling a cancelled question", async function () {

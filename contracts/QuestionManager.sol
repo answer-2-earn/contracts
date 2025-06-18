@@ -143,7 +143,7 @@ contract QuestionManager is
     modifier onlyNotProcessed(bytes32 tokenId) {
         require(
             processingStatuses[tokenId] == QuestionProcessingStatus.None,
-            "Processing status is not None"
+            "Question processing status is not 'None'"
         );
         _;
     }
@@ -156,7 +156,7 @@ contract QuestionManager is
         require(
             processingStatuses[tokenId] !=
                 QuestionProcessingStatus.AnswerValidRewardSent,
-            "Processing status is AnswerValidRewardSent"
+            "Question processing status is 'AnswerValidRewardSent'"
         );
         _;
     }

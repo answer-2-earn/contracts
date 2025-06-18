@@ -135,7 +135,7 @@ describe("QuestionManager: Answering", function () {
           account: answerer.account,
         }
       )
-    ).to.rejectedWith("Processing status is AnswerValidRewardSent");
+    ).to.rejectedWith("Question processing status is 'AnswerValidRewardSent'");
   });
 
   it("Should fail if answering by not answerer", async function () {
