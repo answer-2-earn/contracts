@@ -59,7 +59,10 @@ describe("QuestionManager: Cancellation", function () {
     expect(delta >= minExpectedRefund).to.be.true;
   });
 
-  it("Should fail when cancelling by not asker", async function () {
+  // TODO:
+  it("Should cancel an answered question", async function () {});
+
+  it("Should fail if cancelling by not asker", async function () {
     const { answerer, questionManagerContract, token } = await loadFixture(
       fixtureWithAskedQuestion
     );
@@ -72,7 +75,7 @@ describe("QuestionManager: Cancellation", function () {
     ).to.rejectedWith("Caller is not the asker");
   });
 
-  it("Should fail when cancelling a processed question", async function () {
+  it("Should fail if cancelling a question processed as answer valid reward sent", async function () {
     const { asker, deployer, questionManagerContract, token } =
       await loadFixture(fixtureWithAnsweredQuestion);
 
@@ -88,4 +91,7 @@ describe("QuestionManager: Cancellation", function () {
       })
     ).to.rejectedWith("Processing status is AnswerValidRewardSent");
   });
+
+  // TODO:
+  it("Should fail if cancelling a cancelled question", async function () {});
 });

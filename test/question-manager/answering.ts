@@ -7,7 +7,7 @@ import {
 import { getAnswerMetadataValue } from "../utils/metadata";
 
 describe("QuestionManager: Answering", function () {
-  it("Should answer by answerer", async function () {
+  it("Should answer", async function () {
     const { answerer, questionManagerContract, token } = await loadFixture(
       fixtureWithAskedQuestion
     );
@@ -40,36 +40,13 @@ describe("QuestionManager: Answering", function () {
     expect(processingStatusAfter).to.equal(0); // Still None until processed
   });
 
-  it("Should fail when answering by not answerer", async function () {
-    const { asker, questionManagerContract, token } = await loadFixture(
-      fixtureWithAskedQuestion
-    );
+  // TODO:
+  it("Should answer if question answered and not processed", async function () {});
 
-    await expect(
-      questionManagerContract.write.answer([token, getAnswerMetadataValue()], {
-        account: asker.account,
-      })
-    ).to.rejectedWith("Caller is not the answerer");
-  });
+  // TODO:
+  it("Should answer if question processed as answer invalid", async function () {});
 
-  it("Should fail when answering a cancelled question", async function () {
-    const { answerer, asker, questionManagerContract, token } =
-      await loadFixture(fixtureWithAskedQuestion);
-
-    // Cancel the question first
-    await questionManagerContract.write.cancel([token], {
-      account: asker.account,
-    });
-
-    // Try to answer the cancelled question
-    await expect(
-      questionManagerContract.write.answer([token, getAnswerMetadataValue()], {
-        account: answerer.account,
-      })
-    ).to.rejectedWith(`LSP8NonExistentTokenId("${token}")`);
-  });
-
-  it("Should fail when answering a processed question", async function () {
+  it("Should fail if answering question processed as answer valid and reward sent", async function () {
     const { answerer, deployer, questionManagerContract, token } =
       await loadFixture(fixtureWithAnsweredQuestion);
 
@@ -84,5 +61,34 @@ describe("QuestionManager: Answering", function () {
         account: answerer.account,
       })
     ).to.rejectedWith("Processing status is AnswerValidRewardSent");
+  });
+
+  it("Should fail if answering by not answerer", async function () {
+    const { asker, questionManagerContract, token } = await loadFixture(
+      fixtureWithAskedQuestion
+    );
+
+    await expect(
+      questionManagerContract.write.answer([token, getAnswerMetadataValue()], {
+        account: asker.account,
+      })
+    ).to.rejectedWith("Caller is not the answerer");
+  });
+
+  it("Should fail if answering a cancelled question", async function () {
+    const { answerer, asker, questionManagerContract, token } =
+      await loadFixture(fixtureWithAskedQuestion);
+
+    // Cancel the question first
+    await questionManagerContract.write.cancel([token], {
+      account: asker.account,
+    });
+
+    // Try to answer the cancelled question
+    await expect(
+      questionManagerContract.write.answer([token, getAnswerMetadataValue()], {
+        account: answerer.account,
+      })
+    ).to.rejectedWith(`LSP8NonExistentTokenId("${token}")`);
   });
 });

@@ -109,7 +109,7 @@ describe("QuestionManager: Asking", function () {
     expect(contractBalanceAfter).to.equal(contractBalanceBefore);
   });
 
-  it("Should fail when asking a question to yourself", async function () {
+  it("Should fail if asking a question to yourself", async function () {
     const { userOne, questionManagerContract } = await loadFixture(initFixture);
 
     await expect(

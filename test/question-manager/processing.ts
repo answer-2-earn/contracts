@@ -34,6 +34,9 @@ describe("QuestionManager: Processing", function () {
     );
   });
 
+  // TODO:
+  it("Should process a valid answer for a question without a reward", async function () {});
+
   it("Should process an invalid answer", async function () {
     const { deployer, questionManagerContract, token } = await loadFixture(
       fixtureWithAnsweredQuestion
@@ -51,4 +54,13 @@ describe("QuestionManager: Processing", function () {
       await questionManagerContract.read.getProcessingStatus([token]);
     expect(processingStatusAfter).to.equal(1);
   });
+
+  // TODO:
+  it("Should fail if processing by not validator", async function () {});
+
+  // TODO:
+  it("Should fail if processing a non-answered question", async function () {});
+
+  // TODO:
+  it("Should fail if processing a question processed as answer valid and reward sent", async function () {});
 });
