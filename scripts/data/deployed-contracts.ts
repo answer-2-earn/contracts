@@ -13,8 +13,8 @@ export const CONTRACTS: {
     questionManagerImpl: "0x64b98714fb8c448c1a8Ff982886F286464287f39",
   },
   luksoMainnet: {
-    question: undefined,
-    questionManager: undefined,
-    questionManagerImpl: undefined,
+    question: "0x67e3648A46f970f91D2989643bF8479b76795Bb2",
+    questionManager: "0xe9b3E53Cd4f92DE36aF02e9B763c3Fe5eb02ee0C",
+    questionManagerImpl: "0x1a477251Bc52F3Ef572A2668d073f315659eb2D2",
   },
 };
