@@ -75,6 +75,42 @@ export async function fixtureWithAskedQuestion() {
   };
 }
 
+export async function fixtureWithAskedZeroRewardQuestion() {
+  const {
+    publicClient,
+    deployer,
+    userOne,
+    userTwo,
+    questionContract,
+    questionManagerContract,
+  } = await loadFixture(initFixture);
+
+  const answerer = userOne;
+  const asker = userTwo;
+
+  await questionManagerContract.write.ask(
+    [answerer.account.address, getAskMetadataValue()],
+    {
+      account: asker.account,
+    }
+  );
+
+  const tokens = await questionContract.read.tokenIdsOf([
+    userOne.account.address,
+  ]);
+  const token = tokens[0];
+
+  return {
+    publicClient,
+    deployer,
+    answerer,
+    asker,
+    questionContract,
+    questionManagerContract,
+    token,
+  };
+}
+
 export async function fixtureWithAnsweredQuestion() {
   const {
     publicClient,
@@ -103,5 +139,34 @@ export async function fixtureWithAnsweredQuestion() {
     questionManagerContract,
     token,
     reward,
+  };
+}
+
+export async function fixtureWithAnsweredZeroRewardQuestion() {
+  const {
+    publicClient,
+    deployer,
+    answerer,
+    asker,
+    questionContract,
+    questionManagerContract,
+    token,
+  } = await loadFixture(fixtureWithAskedZeroRewardQuestion);
+
+  await questionManagerContract.write.answer(
+    [token, getAnswerMetadataValue()],
+    {
+      account: answerer.account,
+    }
+  );
+
+  return {
+    publicClient,
+    deployer,
+    answerer,
+    asker,
+    questionContract,
+    questionManagerContract,
+    token,
   };
 }
