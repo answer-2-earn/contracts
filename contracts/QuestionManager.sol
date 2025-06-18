@@ -128,6 +128,15 @@ contract QuestionManager is
     }
 
     /**
+     * @dev Ensures the question has been answered.
+     * @param tokenId The ID of the question token.
+     */
+    modifier onlyAnswered(bytes32 tokenId) {
+        require(answers[tokenId].length > 0, "Question not answered");
+        _;
+    }
+
+    /**
      * @dev Ensures the question has not been processed yet.
      * @param tokenId The ID of the question token.
      */
@@ -280,6 +289,7 @@ contract QuestionManager is
         nonReentrant
         whenNotPaused
         onlyValidator
+        onlyAnswered(tokenId)
         onlyNotProcessed(tokenId)
     {
         // Update the processing status
@@ -312,6 +322,7 @@ contract QuestionManager is
         nonReentrant
         whenNotPaused
         onlyValidator
+        onlyAnswered(tokenId)
         onlyNotProcessed(tokenId)
     {
         processingStatuses[tokenId] = QuestionProcessingStatus.AnswerInvalid;

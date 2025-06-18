@@ -4,6 +4,7 @@ import { parseEther } from "viem";
 import {
   fixtureWithAnsweredQuestion,
   fixtureWithAnsweredZeroRewardQuestion,
+  fixtureWithAskedQuestion,
 } from "../fixtures/question-manager";
 
 describe("QuestionManager: Processing", function () {
@@ -85,12 +86,68 @@ describe("QuestionManager: Processing", function () {
     expect(processingStatusAfter).to.equal(1);
   });
 
-  // TODO:
-  it("Should fail if processing by not validator", async function () {});
+  it("Should fail if processing by not validator", async function () {
+    const { answerer, questionManagerContract, token } = await loadFixture(
+      fixtureWithAnsweredQuestion
+    );
 
-  // TODO:
-  it("Should fail if processing a non-answered question", async function () {});
+    // Try to process as a non-validator
+    await expect(
+      questionManagerContract.write.processValidAnswer([token], {
+        account: answerer.account,
+      })
+    ).to.be.rejected;
 
-  // TODO:
-  it("Should fail if processing a question processed as answer valid and reward sent", async function () {});
+    // Try to process invalid answer as a non-validator
+    await expect(
+      questionManagerContract.write.processInvalidAnswer([token], {
+        account: answerer.account,
+      })
+    ).to.be.rejected;
+  });
+
+  it("Should fail if processing a non-answered question", async function () {
+    const { deployer, questionManagerContract, token } = await loadFixture(
+      fixtureWithAskedQuestion
+    );
+
+    // Attempt to process a question that hasn't been answered yet
+    await expect(
+      questionManagerContract.write.processValidAnswer([token], {
+        account: deployer.account,
+      })
+    ).to.be.rejectedWith("Question not answered");
+
+    // Also try to process as invalid
+    await expect(
+      questionManagerContract.write.processInvalidAnswer([token], {
+        account: deployer.account,
+      })
+    ).to.be.rejectedWith("Question not answered");
+  });
+
+  it("Should fail if processing a question processed as answer valid and reward sent", async function () {
+    const { deployer, questionManagerContract, token } = await loadFixture(
+      fixtureWithAnsweredQuestion
+    );
+
+    // First process the answer as valid
+    await questionManagerContract.write.processValidAnswer([token], {
+      account: deployer.account,
+    });
+
+    // Now try to process it again
+    await expect(
+      questionManagerContract.write.processValidAnswer([token], {
+        account: deployer.account,
+      })
+    ).to.be.rejected;
+
+    // Also try to mark it as invalid after it was marked valid
+    await expect(
+      questionManagerContract.write.processInvalidAnswer([token], {
+        account: deployer.account,
+      })
+    ).to.be.rejected;
+  });
 });
